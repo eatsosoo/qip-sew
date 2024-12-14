@@ -1,9 +1,106 @@
 import sys
+import yaml
+import logging
 from PySide6 import QtCore, QtWidgets
+from datetime import datetime
+from constants import HORIZONTAL_HEADERS, VERTICAL_HEADERS, SEW_ERRORS, PRIMARY_COLOR
+
+# Configure logging
+logging.basicConfig(filename='sew_errors.log', level=logging.INFO, format='%(asctime)s - %(message)s')
+
+with open('config.yaml', 'r') as file:
+    config = yaml.safe_load(file)
+STATION = config["STATION"]
+
+class ErrorWindow(QtWidgets.QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Sewing Errors")
+        self.layout = QtWidgets.QVBoxLayout(self)
+
+        sew_error_layout = QtWidgets.QGridLayout()
+        self.layout.addLayout(sew_error_layout)
+
+        row = 0
+        col = 0
+
+        self.error_counts = {key: 0 for key in SEW_ERRORS.keys()}
+
+        for key, value in SEW_ERRORS.items():
+            block_layout = QtWidgets.QVBoxLayout()
+
+            label = QtWidgets.QLabel(value)
+            label.setAlignment(QtCore.Qt.AlignCenter)
+            font = label.font()
+            font.setPointSize(12)  # Increase the font size
+            label.setFont(font)
+            label.setFixedHeight(40)  # Set fixed height for the label
+
+            h_layout = QtWidgets.QHBoxLayout()
+            decrement_button = QtWidgets.QPushButton("-")
+            decrement_button.setStyleSheet("background-color: red; color: white; font-size: 20px;")
+            decrement_button.setFixedSize(40, 40)  # Set fixed size for decrement button
+            increment_button = QtWidgets.QPushButton("+")
+            increment_button.setStyleSheet(f"background-color: {PRIMARY_COLOR}; color: white; font-size: 20px;")
+            increment_button.setFixedSize(40, 40)  # Set fixed size for increment button
+
+            count_label = QtWidgets.QLabel("0")
+            count_label.setStyleSheet("background-color: white; color: black; font-size: 20px;")
+            count_label.setAlignment(QtCore.Qt.AlignCenter)
+            count_label.setObjectName("count_label")
+
+            decrement_button.clicked.connect(lambda _, k=key: self.update_error_count(k, -1))
+            increment_button.clicked.connect(lambda _, k=key: self.update_error_count(k, 1))
+
+            h_layout.addWidget(decrement_button)
+            h_layout.addWidget(count_label)
+            h_layout.addWidget(increment_button)
+
+            block_widget = QtWidgets.QWidget()
+            block_layout = QtWidgets.QVBoxLayout(block_widget)
+            block_layout.addWidget(label)
+            block_layout.addLayout(h_layout)
+
+            # Apply border and border radius to the block
+            block_widget.setStyleSheet("""
+                QWidget {
+                    border: 1px solid black;
+                    border-radius: 6px;
+                    padding: 5px;
+                    background-color: white;
+                }
+            """)
+
+            sew_error_layout.addWidget(block_widget, row, col)
+            col += 1
+
+            if col == 4:
+                col = 0
+                row += 1
+
+        # Set equal column stretch factors
+        for i in range(4):
+            sew_error_layout.setColumnStretch(i, 1)
+
+    def update_error_count(self, key, delta):
+        self.error_counts[key] += delta
+        self.error_counts[key] = max(0, self.error_counts[key])  # Ensure count doesn't go below 0
+        self.update_error_labels()
+
+    def update_error_labels(self):
+        for key, count in self.error_counts.items():
+            for widget in self.findChildren(QtWidgets.QWidget):
+                if isinstance(widget, QtWidgets.QLabel) and widget.text() == SEW_ERRORS[key]:
+                    count_label = widget.parent().findChild(QtWidgets.QLabel, "count_label")
+                    if count_label:
+                        count_label.setText(str(count))
 
 class MyWidget(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
+
+        self.setWindowTitle("QIP Sewing Inspection")
+        self.resize(1024, 768)
 
         self.layout = QtWidgets.QVBoxLayout(self)
 
@@ -12,49 +109,74 @@ class MyWidget(QtWidgets.QWidget):
         self.grid_layout.setHorizontalSpacing(10)  # Adjust horizontal spacing between columns
         self.layout.addLayout(self.grid_layout)
 
-        labels = [
-            "Ngày kiểm tra",
-            "Danh mục kiểm tra",
-            "Mã nhà máy",
-            "Loại kiểm tra chất lượng",
-            "Dây chuyền",
-            "Tổng số lượng kiểm tra"
-        ]
+        # 1. Add input field section
+        label = QtWidgets.QLabel("Chỉ lệnh")
+        self.grid_layout.addWidget(label, 1, 0)
+        font = label.font()
+        font.setPointSize(12)  # Increase the font size
+        label.setFont(font)
+        input_field = QtWidgets.QLineEdit()
+        input_field.setFixedSize(200, 30)  # Increase input field size
 
-        self.inputs = []
-        for i in range(2):
-            for j in range(4):
-                index = i * 4 + j
-                if index < len(labels):
-                    label = QtWidgets.QLabel(labels[index])
-                    label.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignBottom)  # Align label closer to input
-                    if labels[index] == "Dây chuyền":
-                        input_field = QtWidgets.QComboBox()
-                        input_field.addItems(["A", "B", "C", "D", "E", "F"])
-                    else:
-                        input_field = QtWidgets.QLineEdit()
-                    self.grid_layout.addWidget(label, i * 2, j)
-                    self.grid_layout.addWidget(input_field, i * 2 + 1, j)
-                    self.inputs.append(input_field)
+        # Set font size for input field text
+        input_font = input_field.font()
+        input_font.setPointSize(12)  # Set the desired font size
+        input_field.setFont(input_font)
 
-        # Add table section
-        self.table_widget = QtWidgets.QTableWidget(3, 9)
-        self.table_widget.setHorizontalHeaderLabels([
-            "7:30-8:30", "8:30-9:30", "9:30-10:30", "10:30-11:30", "11:30-12:30",
-            "13:30-14:30", "14:30-15:30", "15:30-16:30", "16:30-17:30"
-        ])
-        self.table_widget.setVerticalHeaderLabels([
-            "Số hàng cần kiểm", "Số hàng lỗi", "Tỉ lệ lỗi (%)"
-        ])
+        self.grid_layout.addWidget(input_field, 1, 1)
+        self.inputs = [input_field]
+
+        # Add button beside the input field
+        button = QtWidgets.QPushButton("Xác nhận")
+        button.setStyleSheet(f"background-color: {PRIMARY_COLOR}; color: white; font-size: 14px; border-radius: 5px;")
+        button.setFixedSize(100, 30)  # Increase button size
+        self.grid_layout.addWidget(button, 1, 2)
+
+        # Label to display the input value
+        self.display_label = QtWidgets.QLabel("")
+        self.display_label.setFont(font)  # Set the same font size for display label
+        self.grid_layout.addWidget(self.display_label, 1, 3)
+        self.station_label = QtWidgets.QLabel(STATION)
+        self.station_label.setFont(font)  # Set the same font size for station label
+        self.grid_layout.addWidget(self.station_label, 1, 3)
+
+        # Connect button click to the function
+        button.clicked.connect(lambda: self.display_input_value(input_field))
+
+        # Store the command value
+        self.mo_no = input_field.text()
+
+        # Add button to open the error window
+        error_window_button = QtWidgets.QPushButton("Lỗi khác")
+        error_window_button.setStyleSheet(f"background-color: {PRIMARY_COLOR}; color: white; font-size: 14px; border-radius: 5px;")
+        error_window_button.setFixedSize(150, 30)
+        self.grid_layout.addWidget(error_window_button, 1, 4)
+        error_window_button.clicked.connect(self.open_error_window)
+
+        # 2. Add table section
+        self.table_widget = QtWidgets.QTableWidget(3, 11)
+        self.table_widget.setHorizontalHeaderLabels(HORIZONTAL_HEADERS)
+        self.table_widget.setVerticalHeaderLabels(VERTICAL_HEADERS)
+
+        # Set font for table cells
+        font = self.table_widget.font()
+        font.setPointSize(12)  # Increase the font size to 12
+        self.table_widget.setFont(font)
+
+        # Set font for headers
+        header_font = self.table_widget.horizontalHeader().font()
+        header_font.setPointSize(14)  # Increase font size for headers
+        self.table_widget.horizontalHeader().setFont(header_font)
+        self.table_widget.verticalHeader().setFont(header_font)
 
         # Data for the first two rows
-        inspection_data = [
-            [100, 120, 140, 160, 180, 200, 220, 240, 260],  # Số hàng cần kiểm
-            [7, 56, 4, 89, 6, 10, 11, 12, 13]  # Số hàng lỗi
+        self.inspection_data = [
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # Số hàng cần kiểm
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]  # Số hàng lỗi
         ]
 
         # Fill data into the table
-        for row_idx, row_data in enumerate(inspection_data):
+        for row_idx, row_data in enumerate(self.inspection_data):
             for col_idx, value in enumerate(row_data):
                 item = QtWidgets.QTableWidgetItem(str(value))
                 item.setTextAlignment(QtCore.Qt.AlignCenter)
@@ -62,86 +184,188 @@ class MyWidget(QtWidgets.QWidget):
                 self.table_widget.setItem(row_idx, col_idx, item)
 
         # Calculate the percentage for the third row
-        for col_idx in range(len(inspection_data[0])):
-            total_checked = inspection_data[0][col_idx]
-            errors = inspection_data[1][col_idx]
+        self.calculate_percentages()
+
+        # Automatically resize column width to fit the window
+        header = self.table_widget.horizontalHeader()
+        header.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+
+        # Set fixed height for the table to fit approximately three rows
+        self.table_widget.setFixedHeight(140)
+
+        # Apply border to all elements in the table
+        self.table_widget.setStyleSheet("""
+            QHeaderView::section {
+                border: 1px solid #f0f0f0;
+                border-left: none;
+                background-color: white;
+                font-size: 14px;
+            }
+        """)
+
+        self.layout.addWidget(self.table_widget)
+
+        # 3. Add timeline selector and quantity input
+        timeline_label = QtWidgets.QLabel("Chọn khung giờ")
+        timeline_label.setFont(font)
+        self.grid_layout.addWidget(timeline_label, 2, 0)
+
+        self.timeline_combo = QtWidgets.QComboBox()
+        self.timeline_combo.addItems(HORIZONTAL_HEADERS)
+        self.timeline_combo.setFont(font)
+        self.timeline_combo.setCurrentIndex(self.get_current_timeline())
+        self.timeline_combo.setStyleSheet("background-color: white;")  # Set font size for the combo box
+        self.grid_layout.addWidget(self.timeline_combo, 2, 1)
+
+        quantity_label = QtWidgets.QLabel("Số lượng cần kiểm")
+        quantity_label.setFont(font)
+        self.grid_layout.addWidget(quantity_label, 2, 2)
+
+        self.quantity_input = QtWidgets.QLineEdit()
+        self.quantity_input.setFont(font)
+        self.grid_layout.addWidget(self.quantity_input, 2, 3)
+
+        update_button = QtWidgets.QPushButton("Cập nhật")
+        update_button.setStyleSheet(f"background-color: {PRIMARY_COLOR}; color: white; font-size: 14px; border-radius: 5px;")
+        update_button.setFixedSize(150, 30)
+        self.grid_layout.addWidget(update_button, 2, 4)
+        update_button.clicked.connect(self.update_quantity)
+
+        # 4. Add sewing error section
+        sew_error_layout = QtWidgets.QGridLayout()
+        self.layout.addLayout(sew_error_layout)
+
+        row = 0
+        col = 0
+
+        self.error_counts = {key: 0 for key in SEW_ERRORS.keys()}
+
+        for key, value in SEW_ERRORS.items():
+            block_layout = QtWidgets.QVBoxLayout()
+
+            label = QtWidgets.QLabel(value)
+            label.setAlignment(QtCore.Qt.AlignCenter)
+            font = label.font()
+            font.setPointSize(12)  # Increase the font size
+            label.setFont(font)
+            label.setFixedHeight(40)  # Set fixed height for the label
+
+            h_layout = QtWidgets.QHBoxLayout()
+            decrement_button = QtWidgets.QPushButton("-")
+            decrement_button.setStyleSheet("background-color: red; color: white; font-size: 20px;")
+            decrement_button.setFixedSize(40, 40)  # Set fixed size for decrement button
+            increment_button = QtWidgets.QPushButton("+")
+            increment_button.setStyleSheet(f"background-color: {PRIMARY_COLOR}; color: white; font-size: 20px;")
+            increment_button.setFixedSize(40, 40)  # Set fixed size for increment button
+
+            count_label = QtWidgets.QLabel("0")
+            count_label.setStyleSheet("background-color: white; color: black; font-size: 20px;")
+            count_label.setAlignment(QtCore.Qt.AlignCenter)
+            count_label.setObjectName("count_label")
+
+            decrement_button.clicked.connect(lambda _, k=key: self.update_error_count(k, -1))
+            increment_button.clicked.connect(lambda _, k=key: self.update_error_count(k, 1))
+
+            h_layout.addWidget(decrement_button)
+            h_layout.addWidget(count_label)
+            h_layout.addWidget(increment_button)
+
+            block_widget = QtWidgets.QWidget()
+            block_layout = QtWidgets.QVBoxLayout(block_widget)
+            block_layout.addWidget(label)
+            block_layout.addLayout(h_layout)
+
+            # Apply border and border radius to the block
+            block_widget.setStyleSheet("""
+                QWidget {
+                    border: 1px solid black;
+                    border-radius: 6px;
+                    padding: 5px;
+                    background-color: white;
+                }
+            """)
+
+            sew_error_layout.addWidget(block_widget, row, col)
+            col += 1
+
+            if col == 4:
+                col = 0
+                row += 1
+
+        # Set equal column stretch factors
+        for i in range(4):
+            sew_error_layout.setColumnStretch(i, 1)
+
+    def get_current_timeline(self):
+        current_time = datetime.now().time()
+        for idx, header in enumerate(HORIZONTAL_HEADERS):
+            start_time_str, end_time_str = header.split('-')
+            start_time = datetime.strptime(start_time_str, "%H:%M").time()
+            end_time = datetime.strptime(end_time_str, "%H:%M").time()
+            if start_time <= current_time <= end_time:
+                return idx
+        return None
+
+    def update_error_count(self, key, delta):
+        self.error_counts[key] += delta
+        self.error_counts[key] = max(0, self.error_counts[key])  # Ensure count doesn't go below 0
+        self.update_error_labels()
+
+        # Update the error quantity and recalculate the error rate
+        timeline_idx = self.get_current_timeline()
+        if timeline_idx is not None:
+            self.inspection_data[1][timeline_idx] += delta
+            self.inspection_data[1][timeline_idx] = max(0, self.inspection_data[1][timeline_idx])  # Ensure count doesn't go below 0
+            self.update_error_quantity(timeline_idx)
+            self.calculate_percentages()
+
+    def update_error_quantity(self, timeline_idx):
+        error_quantity = self.inspection_data[1][timeline_idx]
+        item = QtWidgets.QTableWidgetItem(str(error_quantity))
+        item.setTextAlignment(QtCore.Qt.AlignCenter)
+        item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)  # Make cells read-only
+        self.table_widget.setItem(1, timeline_idx, item)
+
+    def update_error_labels(self):
+        for key, count in self.error_counts.items():
+            for widget in self.findChildren(QtWidgets.QWidget):
+                if isinstance(widget, QtWidgets.QLabel) and widget.text() == SEW_ERRORS[key]:
+                    count_label = widget.parent().findChild(QtWidgets.QLabel, "count_label")
+                    if count_label:
+                        count_label.setText(str(count))
+
+    def calculate_percentages(self):
+        for col_idx in range(len(self.inspection_data[0])):
+            total_checked = self.inspection_data[0][col_idx]
+            errors = self.inspection_data[1][col_idx]
             percentage = (errors / total_checked * 100) if total_checked > 0 else 0  # Avoid division by zero
             percentage_item = QtWidgets.QTableWidgetItem(f"{percentage:.2f}%")
             percentage_item.setTextAlignment(QtCore.Qt.AlignCenter)
             percentage_item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)  # Make cells read-only
             self.table_widget.setItem(2, col_idx, percentage_item)
 
-        # Automatically resize column width to fit the window
-        header = self.table_widget.horizontalHeader()
-        header.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+    def display_input_value(self, input_field):
+        self.display_label.setText(input_field.text())
 
-        self.layout.insertWidget(1, self.table_widget)
+    def open_error_window(self):
+        self.error_window = ErrorWindow(self)
+        self.error_window.show()
 
-
-        # Add sewing error section
-        sew_errors = {
-            "combination_is_marked": "Tổ hợp bị hằn",
-            "combination_has_open_grinding": "Tổ hợp bị hở bào mài",
-            "unfavorable_sewing_line": "Đường gò không thuận",
-            "sewing_thread_error": "Đường may chỉ lỗi",
-            "back_height_uneven_misaligned": "Hậu cao thấp, lệch hậu",
-            "nay_niry_too_high_unfavorable": "Nây nỷ nhô cao, không thuận",
-            "hair_length_uneven_not_yet_shed": "Lông dài ngắn, chưa gảy lông",
-            "button_is_loose_tight_reversed_missing": "Khuy Oze lỏng, chặt, ngược, thiếu",
-            "edge_is_dented_wrinkled_uneven_length": "Viền móp, nhăn, dài ngắn",
-            "stitching_is_missing_loose_tight": "Khâu thiếu, lỏng, chặt",
-            "fabric_color_faded_hair_cracked": "Xía miên mất màu, rạn nứt lông",
-            "zipper_head_uneven_height": "Đầu khóa, la len cao thấp",
-            "shape_line_not_enough_curvature": "Vệt định hình, không đủ độ cong",
-            "elastic_thread_not_straight": "Chun rút sợi không thẳng",
-            "raw_cow_head_uneven_high_low": "Đầu bò sống lệch, cao thấp",
-            "ear_strap_uneven_short_long": "Dây tai dài ngắn, lệch",
-            "hole_punched_torn_misaligned_not_clear": "Đục lỗ toét, lệch, không thông",
-            "valid_combination_not_flexible": "Hợp lệch xía uyển",
-            "fake_stitching_pencil_line_on_form": "May giả chỉ, vạch chì chân phom",
-            "back_shaping_knife_insertion_incorrect": "Định hình hậu xỏ dao không đúng",
-        }
-
-        row = 4
-        col = 0
-
-        for key, value in sew_errors.items():
-            block_layout = QtWidgets.QVBoxLayout()
-
-            label = QtWidgets.QLabel(value)
-            label.setAlignment(QtCore.Qt.AlignCenter)
-
-            h_layout = QtWidgets.QHBoxLayout()
-            decrement_button = QtWidgets.QPushButton("-")
-            decrement_button.setStyleSheet("background-color: red; color: white;")
-            count_label = QtWidgets.QLabel("0")
-            increment_button = QtWidgets.QPushButton("+")
-            increment_button.setStyleSheet("background-color: green; color: white;")
-
-            count_label.setAlignment(QtCore.Qt.AlignCenter)
-            h_layout.addWidget(decrement_button)
-            h_layout.addWidget(count_label)
-            h_layout.addWidget(increment_button)
-
-            block_layout.addWidget(label)
-            block_layout.addLayout(h_layout)
-
-            block_widget = QtWidgets.QWidget()
-            block_widget.setLayout(block_layout)
-            block_widget.setStyleSheet("border: 1px solid black; background-color: white;")
-
-            self.grid_layout.addWidget(block_widget, row, col)
-
-            col += 1
-            if col == 4:
-                col = 0
-                row += 1
+    def update_quantity(self):
+        timeline_idx = self.timeline_combo.currentIndex()
+        try:
+            quantity = int(self.quantity_input.text())
+            self.inspection_data[0][timeline_idx] = quantity
+            item = QtWidgets.QTableWidgetItem(str(quantity))
+            item.setTextAlignment(QtCore.Qt.AlignCenter)
+            item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)  # Make cells read-only
+            self.table_widget.setItem(0, timeline_idx, item)
+            self.calculate_percentages()
+        except ValueError:
+            QtWidgets.QMessageBox.warning(self, "Invalid Input", "Please enter a valid number for quantity.")
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication([])
-
     widget = MyWidget()
-    widget.resize(800, 600)
     widget.show()
-
     sys.exit(app.exec())
