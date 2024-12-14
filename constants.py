@@ -22,6 +22,52 @@ VERTICAL_HEADERS = [
     "Tỉ lệ lỗi (%)"
 ]
 
+COLUMNS = {
+    "DTQC1001": "May hợp không thẳng",
+    "DTQC1002": "Dán lót hậu xấu",
+    "DTQC1003": "Lót ngắn, lót nhăn",
+    "DTQC1004": "Định hình mũ bị nhăn",
+    "DTQC1005": "Xía miên nhăn",
+    "DTQC1006": "May khóa bị lệch",
+    "DTQC1007": "Cắt mí nây nỷ không đẹp",
+    "DTQC1008": "Đồ sơn xấu",
+    "DTQC1009": "Nây nỷ sai tem",
+    "DTQC1010": "Khoảng cách mí không đều",
+    "DTQC1011": "Cổ giày và miệng giày cao thấp",
+    "DTQC1012": "Logo cao thấp",
+    "DTQC1013": "Đầu chỉ",
+    "DTQC1014": "Khoảng cách may không đều",
+    "DTQC1015": "May ziczac xấu",
+    "DTQC1016": "Xía miên khác màu",
+    "DTQC1017": "Mũ giày bẩn",
+    "DTQC1018": "Sai chỉ",
+    "DTQC1019": "May không đúng vị trí",
+    # "DRQC1001": "May hợp không thẳng",
+    # "DRQC1002": "Dán lót hậu xấu",
+    # "DRQC1003": "Lót ngắn, lót nhăn",
+    # "DRQC1004": "Định hình mũ bị nhăn",
+    # "DRQC1005": "Xía miên nhăn",
+    # "DRQC1006": "May khóa bị lệch",
+    # "DRQC1007": "Cắt mí nây nỷ không đẹp",
+    # "DRQC1008": "Đồ sơn xấu",
+    # "DRQC1009": "Nây nỷ sai tem",
+    # "DRQC1010": "Khoảng cách mí không đều",
+    # "DRQC1011": "Cổ giày và miệng giày cao thấp",
+    # "DRQC1012": "Logo cao thấp",
+    # "DRQC1013": "Đầu chỉ",
+    # "DRQC1014": "Khoảng cách may không đều",
+    # "DRQC1015": "May ziczac xấu",
+    # "DRQC1016": "Xía miên khác màu",
+    # "DRQC1017": "Vệ sinh bẩn, xía miên không sạch",
+    # "DRQC1018": "Sai chỉ",
+    # "DRQC1019": "May không đúng vị trí",
+    # "DRQC1020": "Xía miên bị cong, nghiêng",
+    # "DRQC1021": "Kim bị lỗi",
+    # "DRQC1022": "Lỗ đục ở lưỡi gà xấu",
+    # "DRQC1023": "May thiếu",
+    # "DRQC1024": "Sai vị trí tăng cường",
+}
+
 SEW_ERRORS = {
     "combination_is_marked": "Tổ hợp bị hằn",
     "combination_has_open_grinding": "Tổ hợp bị hở bào mài",
@@ -60,3 +106,50 @@ SEW_GL3 = {
 }
 
 PRIMARY_COLOR = '#00c04b'
+DANGER_COLOR = '#ff5b00'
+
+STYLE_SCROLLBAR = """
+    QScrollBar:vertical {
+        border: none;
+        background: #f5f5f5;  /* Màu nền */
+        width: 8px;  /* Độ rộng thanh cuộn dọc */
+        margin: 0px 0px 0px 0px;
+    }
+
+    QScrollBar::handle:vertical {
+        background: #c4c4c4;  /* Màu thanh cuộn */
+        min-height: 20px;
+        border-radius: 4px;  /* Bo góc */
+    }
+
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+        border: none;
+        background: none;
+    }
+
+    QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+        background: none;
+    }
+
+    QScrollBar:horizontal {
+        border: none;
+        background: #f5f5f5;  /* Màu nền */
+        height: 8px;  /* Độ cao thanh cuộn ngang */
+        margin: 0px 0px 0px 0px;
+    }
+
+    QScrollBar::handle:horizontal {
+        background: #c4c4c4;  /* Màu thanh cuộn */
+        min-width: 20px;
+        border-radius: 4px;  /* Bo góc */
+    }
+
+    QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+        border: none;
+        background: none;
+    }
+
+    QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+        background: none;
+    }
+"""

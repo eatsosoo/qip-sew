@@ -3,7 +3,7 @@ import yaml
 import logging
 from PySide6 import QtCore, QtWidgets
 from datetime import datetime
-from constants import HORIZONTAL_HEADERS, VERTICAL_HEADERS, SEW_ERRORS, PRIMARY_COLOR
+from constants import HORIZONTAL_HEADERS, VERTICAL_HEADERS, COLUMNS, SEW_ERRORS, PRIMARY_COLOR, DANGER_COLOR, STYLE_SCROLLBAR
 
 # Configure logging
 logging.basicConfig(filename='sew_errors.log', level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -12,10 +12,11 @@ with open('config.yaml', 'r') as file:
     config = yaml.safe_load(file)
 STATION = config["STATION"]
 
-class ErrorWindow(QtWidgets.QWidget):
+class SecondWindow(QtWidgets.QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Sewing Errors")
+        self.resize(1024, 768)
+        self.setWindowTitle(f"Other Sewing Errors {STATION}")
         self.layout = QtWidgets.QVBoxLayout(self)
 
         sew_error_layout = QtWidgets.QGridLayout()
@@ -90,7 +91,7 @@ class ErrorWindow(QtWidgets.QWidget):
     def update_error_labels(self):
         for key, count in self.error_counts.items():
             for widget in self.findChildren(QtWidgets.QWidget):
-                if isinstance(widget, QtWidgets.QLabel) and widget.text() == SEW_ERRORS[key]:
+                if isinstance(widget, QtWidgets.QLabel) and widget.text() == COLUMNS[key]:
                     count_label = widget.parent().findChild(QtWidgets.QLabel, "count_label")
                     if count_label:
                         count_label.setText(str(count))
@@ -99,9 +100,9 @@ class MyWidget(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("QIP Sewing Inspection")
+        self.setWindowTitle(f"QIP Sewing Inspection {STATION}")
         self.resize(1024, 768)
-
+        self.second_window = None
         self.layout = QtWidgets.QVBoxLayout(self)
 
         self.grid_layout = QtWidgets.QGridLayout()
@@ -136,9 +137,6 @@ class MyWidget(QtWidgets.QWidget):
         self.display_label = QtWidgets.QLabel("")
         self.display_label.setFont(font)  # Set the same font size for display label
         self.grid_layout.addWidget(self.display_label, 1, 3)
-        self.station_label = QtWidgets.QLabel(STATION)
-        self.station_label.setFont(font)  # Set the same font size for station label
-        self.grid_layout.addWidget(self.station_label, 1, 3)
 
         # Connect button click to the function
         button.clicked.connect(lambda: self.display_input_value(input_field))
@@ -147,16 +145,17 @@ class MyWidget(QtWidgets.QWidget):
         self.mo_no = input_field.text()
 
         # Add button to open the error window
-        error_window_button = QtWidgets.QPushButton("Lỗi khác")
-        error_window_button.setStyleSheet(f"background-color: {PRIMARY_COLOR}; color: white; font-size: 14px; border-radius: 5px;")
-        error_window_button.setFixedSize(150, 30)
-        self.grid_layout.addWidget(error_window_button, 1, 4)
-        error_window_button.clicked.connect(self.open_error_window)
+        others_error_window_btn = QtWidgets.QPushButton("Lỗi khác")
+        others_error_window_btn.setStyleSheet(f"background-color: {DANGER_COLOR}; color: white; font-size: 14px; border-radius: 5px;")
+        others_error_window_btn.setFixedSize(150, 30)
+        self.grid_layout.addWidget(others_error_window_btn, 1, 4)
+        others_error_window_btn.clicked.connect(self.open_other_error_window)
 
         # 2. Add table section
         self.table_widget = QtWidgets.QTableWidget(3, 11)
         self.table_widget.setHorizontalHeaderLabels(HORIZONTAL_HEADERS)
         self.table_widget.setVerticalHeaderLabels(VERTICAL_HEADERS)
+        self.table_widget.verticalHeader().setFixedWidth(120)
 
         # Set font for table cells
         font = self.table_widget.font()
@@ -232,18 +231,30 @@ class MyWidget(QtWidgets.QWidget):
         update_button.clicked.connect(self.update_quantity)
 
         # 4. Add sewing error section
-        sew_error_layout = QtWidgets.QGridLayout()
-        self.layout.addLayout(sew_error_layout)
+        scroll_area = QtWidgets.QScrollArea()
+        scroll_area.setWidgetResizable(True)  # Cho phép widget thay đổi kích thước theo scroll area
+        scroll_area.setStyleSheet(STYLE_SCROLLBAR)  # Thêm thanh cuộn theo style đã thiết lập
+        scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        
+        # Tạo widget để chứa sew_error_layout
+        sew_error_widget = QtWidgets.QWidget()
+        sew_error_layout = QtWidgets.QGridLayout(sew_error_widget)
+
+        scroll_area.setWidget(sew_error_widget)  # Đặt widget chứa layout vào scroll area
+        self.layout.addWidget(scroll_area)
 
         row = 0
         col = 0
 
-        self.error_counts = {key: 0 for key in SEW_ERRORS.keys()}
+        self.error_counts = {key: 0 for key in COLUMNS.keys()}
+        index = 0
 
-        for key, value in SEW_ERRORS.items():
+        for key, value in COLUMNS.items():
+            index += 1
             block_layout = QtWidgets.QVBoxLayout()
 
-            label = QtWidgets.QLabel(value)
+            label = QtWidgets.QLabel(f"{index}. {value}")
             label.setAlignment(QtCore.Qt.AlignCenter)
             font = label.font()
             font.setPointSize(12)  # Increase the font size
@@ -310,6 +321,8 @@ class MyWidget(QtWidgets.QWidget):
         self.error_counts[key] += delta
         self.error_counts[key] = max(0, self.error_counts[key])  # Ensure count doesn't go below 0
         self.update_error_labels()
+        
+        logging.info(f"Update '{key}' count changed by {delta}. New count: {self.error_counts[key]}")
 
         # Update the error quantity and recalculate the error rate
         timeline_idx = self.get_current_timeline()
@@ -329,7 +342,7 @@ class MyWidget(QtWidgets.QWidget):
     def update_error_labels(self):
         for key, count in self.error_counts.items():
             for widget in self.findChildren(QtWidgets.QWidget):
-                if isinstance(widget, QtWidgets.QLabel) and widget.text() == SEW_ERRORS[key]:
+                if isinstance(widget, QtWidgets.QLabel) and widget.text() == COLUMNS[key]:
                     count_label = widget.parent().findChild(QtWidgets.QLabel, "count_label")
                     if count_label:
                         count_label.setText(str(count))
@@ -347,9 +360,12 @@ class MyWidget(QtWidgets.QWidget):
     def display_input_value(self, input_field):
         self.display_label.setText(input_field.text())
 
-    def open_error_window(self):
-        self.error_window = ErrorWindow(self)
-        self.error_window.show()
+    def open_other_error_window(self):
+        print("Opening other error window")
+        # Khởi tạo cửa sổ phụ và hiển thị
+        if not self.second_window:  # Nếu cửa sổ chưa tồn tại
+            self.second_window = SecondWindow()
+        self.second_window.show()
 
     def update_quantity(self):
         timeline_idx = self.timeline_combo.currentIndex()
