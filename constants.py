@@ -1,5 +1,5 @@
 # constants.py
-
+# -*- coding: utf-8 -*-
 # Table headers
 HORIZONTAL_HEADERS = [
     "07:30-08:30", 
