@@ -2,7 +2,9 @@
 import sys
 import yaml
 import logging
+from functools import partial
 from PySide import QtCore, QtGui
+from PySide.QtGui import QFontDatabase
 from datetime import datetime
 from constants import HORIZONTAL_HEADERS, VERTICAL_HEADERS, COLUMNS, SEW_ERRORS, PRIMARY_COLOR, DANGER_COLOR, STYLE_SCROLLBAR
 
@@ -17,7 +19,7 @@ class SecondWindow(QtGui.QWidget):
     def __init__(self, parent=None):
         super(SecondWindow, self).__init__(parent)
         self.resize(1024, 768)
-        self.setWindowTitle("Other Sewing Errors {}".format(STATION))
+        self.setWindowTitle(u"Other Sewing Errors {}".format(STATION))
         self.layout = QtGui.QVBoxLayout(self)
 
         sew_error_layout = QtGui.QGridLayout()
@@ -51,8 +53,8 @@ class SecondWindow(QtGui.QWidget):
             count_label.setAlignment(QtCore.Qt.AlignCenter)
             count_label.setObjectName("count_label")
 
-            decrement_button.clicked.connect(lambda _, k=key: self.update_error_count(k, -1))
-            increment_button.clicked.connect(lambda _, k=key: self.update_error_count(k, 1))
+            decrement_button.clicked.connect(lambda _, k=key, btn=decrement_button: self.update_error_count(k, -1))
+            increment_button.clicked.connect(lambda _, k=key, btn=increment_button: self.update_error_count(k, 1))
 
             h_layout.addWidget(decrement_button)
             h_layout.addWidget(count_label)
@@ -101,7 +103,7 @@ class MyWidget(QtGui.QWidget):
     def __init__(self):
         super(MyWidget, self).__init__()
 
-        self.setWindowTitle("QIP Sewing Inspection {}".format(STATION))
+        self.setWindowTitle(u"QIP Sewing Inspection {}".format(STATION))
         self.resize(1024, 768)
         self.second_window = None
         self.layout = QtGui.QVBoxLayout(self)
@@ -111,8 +113,20 @@ class MyWidget(QtGui.QWidget):
         self.grid_layout.setHorizontalSpacing(10)  # Adjust horizontal spacing between columns
         self.layout.addLayout(self.grid_layout)
 
+        # Load the custom font
+        font_id = QFontDatabase.addApplicationFont("fonts/Roboto-Regular.ttf")
+        if font_id == -1:
+            print("Failed to load the custom font!")
+        else:
+            font_family = QFontDatabase.applicationFontFamilies(font_id)[0]
+            print("Loaded font: {}".format(font_family))
+        
+            # Set the custom font globally
+            font = QtGui.QFont(font_family, 12)  # Font size 12
+            QtGui.QApplication.setFont(font)
+
         # 1. Add input field section
-        label = QtGui.QLabel("Chỉ lệnh")
+        label = QtGui.QLabel(u"Chỉ lệnh")
         self.grid_layout.addWidget(label, 1, 0)
         font = label.font()
         font.setPointSize(12)  # Increase the font size
@@ -129,7 +143,7 @@ class MyWidget(QtGui.QWidget):
         self.inputs = [input_field]
 
         # Add button beside the input field
-        button = QtGui.QPushButton("Xác nhận")
+        button = QtGui.QPushButton(u"Xác nhận")
         button.setStyleSheet("background-color: {}; color: white; font-size: 14px; border-radius: 5px;".format(PRIMARY_COLOR))
         button.setFixedSize(100, 30)  # Increase button size
         self.grid_layout.addWidget(button, 1, 2)
@@ -146,7 +160,7 @@ class MyWidget(QtGui.QWidget):
         self.mo_no = input_field.text()
 
         # Add button to open the error window
-        others_error_window_btn = QtGui.QPushButton("Lỗi khác")
+        others_error_window_btn = QtGui.QPushButton(u"Lỗi khác")
         others_error_window_btn.setStyleSheet("background-color: {}; color: white; font-size: 14px; border-radius: 5px;".format(DANGER_COLOR))
         others_error_window_btn.setFixedSize(150, 30)
         self.grid_layout.addWidget(others_error_window_btn, 1, 4)
@@ -191,7 +205,7 @@ class MyWidget(QtGui.QWidget):
         header.setResizeMode(QtGui.QHeaderView.Stretch)
 
         # Set fixed height for the table to fit approximately three rows
-        self.table_widget.setFixedHeight(140)
+        self.table_widget.setFixedHeight(118)
 
         # Apply border to all elements in the table
         self.table_widget.setStyleSheet("""
@@ -206,7 +220,7 @@ class MyWidget(QtGui.QWidget):
         self.layout.addWidget(self.table_widget)
 
         # 3. Add timeline selector and quantity input
-        timeline_label = QtGui.QLabel("Chọn khung giờ")
+        timeline_label = QtGui.QLabel(u"Chọn khung giờ")
         timeline_label.setFont(font)
         self.grid_layout.addWidget(timeline_label, 2, 0)
 
@@ -217,7 +231,7 @@ class MyWidget(QtGui.QWidget):
         self.timeline_combo.setStyleSheet("background-color: white;")  # Set font size for the combo box
         self.grid_layout.addWidget(self.timeline_combo, 2, 1)
 
-        quantity_label = QtGui.QLabel("Số lượng cần kiểm")
+        quantity_label = QtGui.QLabel(u"Số lượng cần kiểm")
         quantity_label.setFont(font)
         self.grid_layout.addWidget(quantity_label, 2, 2)
 
@@ -225,7 +239,7 @@ class MyWidget(QtGui.QWidget):
         self.quantity_input.setFont(font)
         self.grid_layout.addWidget(self.quantity_input, 2, 3)
 
-        update_button = QtGui.QPushButton("Cập nhật")
+        update_button = QtGui.QPushButton(u"Cập nhật")
         update_button.setStyleSheet("background-color: {}; color: white; font-size: 14px; border-radius: 5px;".format(PRIMARY_COLOR))
         update_button.setFixedSize(150, 30)
         update_button.clicked.connect(lambda: self.update_quantity())
@@ -235,8 +249,8 @@ class MyWidget(QtGui.QWidget):
         scroll_area = QtGui.QScrollArea()
         scroll_area.setWidgetResizable(True)  # Cho phép widget thay đổi kích thước theo scroll area
         scroll_area.setStyleSheet(STYLE_SCROLLBAR)  # Thêm thanh cuộn theo style đã thiết lập
-        scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        # scroll_area.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        # scroll_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         
         # Tạo widget để chứa sew_error_layout
         sew_error_widget = QtGui.QWidget()
@@ -255,7 +269,7 @@ class MyWidget(QtGui.QWidget):
             index += 1
             block_layout = QtGui.QVBoxLayout()
 
-            label = QtGui.QLabel("{}. {}".format(index, value))
+            label = QtGui.QLabel(u"{}. {}".format(index, value))
             label.setAlignment(QtCore.Qt.AlignCenter)
             font = label.font()
             font.setPointSize(12)  # Increase the font size
@@ -275,8 +289,8 @@ class MyWidget(QtGui.QWidget):
             count_label.setAlignment(QtCore.Qt.AlignCenter)
             count_label.setObjectName("count_label")
 
-            decrement_button.clicked.connect(lambda _, k=key: self.update_error_count(k, -1))
-            increment_button.clicked.connect(lambda _, k=key: self.update_error_count(k, 1))
+            decrement_button.clicked.connect(partial(self.update_error_count, key, -1))
+            increment_button.clicked.connect(partial(self.update_error_count, key, 1))
 
             h_layout.addWidget(decrement_button)
             h_layout.addWidget(count_label)
@@ -319,11 +333,12 @@ class MyWidget(QtGui.QWidget):
         return 0
 
     def update_error_count(self, key, delta):
+        print(key)
         self.error_counts[key] += delta
         self.error_counts[key] = max(0, self.error_counts[key])  # Ensure count doesn't go below 0
         self.update_error_labels()
         
-        logging.info("Update '{}' count changed by {}. New count: {}".format(key, delta, self.error_counts[key]))
+        logging.info(u"Update '{}' count changed by {}. New count: {}".format(key, delta, self.error_counts[key]))
 
         # Update the error quantity and recalculate the error rate
         timeline_idx = self.get_current_timeline()
@@ -343,7 +358,7 @@ class MyWidget(QtGui.QWidget):
     def update_error_labels(self):
         for key, count in self.error_counts.items():
             for widget in self.findChildren(QtGui.QWidget):
-                if isinstance(widget, QtGui.QLabel) and widget.text() == COLUMNS[key]:
+                if isinstance(widget, QtGui.QLabel) and widget.text().startswith(COLUMNS[key]):
                     count_label = widget.parent().findChild(QtGui.QLabel, "count_label")
                     if count_label:
                         count_label.setText(str(count))
