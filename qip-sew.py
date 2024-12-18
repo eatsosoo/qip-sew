@@ -16,6 +16,8 @@ with open('config.yaml', 'r') as file:
 STATION = config["STATION"]
 
 class SecondWindow(QtGui.QWidget):
+    error_count_updated = QtCore.Signal(str, int)
+
     def __init__(self, parent=None):
         super(SecondWindow, self).__init__(parent)
         self.resize(1024, 768)
@@ -53,8 +55,8 @@ class SecondWindow(QtGui.QWidget):
             count_label.setAlignment(QtCore.Qt.AlignCenter)
             count_label.setObjectName("count_label")
 
-            decrement_button.clicked.connect(lambda _, k=key, btn=decrement_button: self.update_error_count(k, -1))
-            increment_button.clicked.connect(lambda _, k=key, btn=increment_button: self.update_error_count(k, 1))
+            decrement_button.clicked.connect(partial(self.update_error_count, key, -1))
+            increment_button.clicked.connect(partial(self.update_error_count, key, 1))
 
             h_layout.addWidget(decrement_button)
             h_layout.addWidget(count_label)
@@ -89,19 +91,21 @@ class SecondWindow(QtGui.QWidget):
     def update_error_count(self, key, delta):
         self.error_counts[key] += delta
         self.error_counts[key] = max(0, self.error_counts[key])  # Ensure count doesn't go below 0
-        self.update_error_labels()
+        self.update_error_labels(key)
 
-    def update_error_labels(self):
-        for key, count in self.error_counts.items():
-            for widget in self.findChildren(QtGui.QWidget):
-                if isinstance(widget, QtGui.QLabel) and widget.text() == COLUMNS[key]:
-                    count_label = widget.parent().findChild(QtGui.QLabel, "count_label")
-                    if count_label:
-                        count_label.setText(str(count))
+        # Emit the signal to notify the main window
+        self.error_count_updated.emit(key, delta)
 
-class MyWidget(QtGui.QWidget):
+    def update_error_labels(self, key):
+        for widget in self.findChildren(QtGui.QWidget):
+            if isinstance(widget, QtGui.QLabel) and widget.text() in SEW_ERRORS[key]:
+                count_label = widget.parent().findChild(QtGui.QLabel, "count_label")
+                if count_label:
+                    count_label.setText(str(self.error_counts[key]))
+
+class MainWindow(QtGui.QWidget):
     def __init__(self):
-        super(MyWidget, self).__init__()
+        super(MainWindow, self).__init__()
 
         self.setWindowTitle(u"QIP Sewing Inspection {}".format(STATION))
         self.resize(1024, 768)
@@ -279,10 +283,10 @@ class MyWidget(QtGui.QWidget):
             h_layout = QtGui.QHBoxLayout()
             decrement_button = QtGui.QPushButton("-")
             decrement_button.setStyleSheet("background-color: red; color: white; font-size: 20px;")
-            decrement_button.setFixedSize(40, 40)  # Set fixed size for decrement button
+            decrement_button.setFixedSize(80, 40)  # Set fixed size for decrement button
             increment_button = QtGui.QPushButton("+")
             increment_button.setStyleSheet("background-color: {}; color: white; font-size: 20px;".format(PRIMARY_COLOR))
-            increment_button.setFixedSize(40, 40)  # Set fixed size for increment button
+            increment_button.setFixedSize(80, 40)  # Set fixed size for increment button
 
             count_label = QtGui.QLabel("0")
             count_label.setStyleSheet("background-color: white; color: black; font-size: 20px;")
@@ -333,14 +337,22 @@ class MyWidget(QtGui.QWidget):
         return 0
 
     def update_error_count(self, key, delta):
-        print(key)
         self.error_counts[key] += delta
         self.error_counts[key] = max(0, self.error_counts[key])  # Ensure count doesn't go below 0
-        self.update_error_labels()
+        self.update_error_labels(key, delta)
         
         logging.info(u"Update '{}' count changed by {}. New count: {}".format(key, delta, self.error_counts[key]))
 
         # Update the error quantity and recalculate the error rate
+        timeline_idx = self.get_current_timeline()
+        if timeline_idx is not None:
+            self.inspection_data[1][timeline_idx] += delta
+            self.inspection_data[1][timeline_idx] = max(0, self.inspection_data[1][timeline_idx])  # Ensure count doesn't go below 0
+            self.update_error_quantity(timeline_idx)
+            self.calculate_percentages()
+    
+    def update_table_from_second_window(self, key, delta):
+        print(key, delta)
         timeline_idx = self.get_current_timeline()
         if timeline_idx is not None:
             self.inspection_data[1][timeline_idx] += delta
@@ -355,19 +367,21 @@ class MyWidget(QtGui.QWidget):
         item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)  # Make cells read-only
         self.table_widget.setItem(1, timeline_idx, item)
 
-    def update_error_labels(self):
-        for key, count in self.error_counts.items():
-            for widget in self.findChildren(QtGui.QWidget):
-                if isinstance(widget, QtGui.QLabel) and widget.text().startswith(COLUMNS[key]):
-                    count_label = widget.parent().findChild(QtGui.QLabel, "count_label")
-                    if count_label:
-                        count_label.setText(str(count))
+    def update_error_labels(self, key, delta):
+        for widget in self.findChildren(QtGui.QWidget):
+            if isinstance(widget, QtGui.QLabel) and widget.text() in COLUMNS[key]:
+                count_label = widget.parent().findChild(QtGui.QLabel, "count_label")
+                if count_label:
+                    count_label.setText(str(self.error_counts[key]))
 
     def calculate_percentages(self):
         for col_idx in range(len(self.inspection_data[0])):
             total_checked = self.inspection_data[0][col_idx]
             errors = self.inspection_data[1][col_idx]
-            percentage = (errors / total_checked * 100) if total_checked > 0 else 0  # Avoid division by zero
+            if total_checked > 0:
+                percentage = (errors / float(total_checked) * 100)  # Convert to float for division
+            else:
+                percentage = 0  # Avoid division by zero
             percentage_item = QtGui.QTableWidgetItem("{}%".format(round(percentage, 2)))
             percentage_item.setTextAlignment(QtCore.Qt.AlignCenter)
             percentage_item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)  # Make cells read-only
@@ -382,6 +396,7 @@ class MyWidget(QtGui.QWidget):
         if not self.second_window:  # Nếu cửa sổ chưa tồn tại
             self.second_window = SecondWindow()
         self.second_window.show()
+        self.second_window.error_count_updated.connect(self.update_table_from_second_window)
 
     def update_quantity(self):
         timeline_idx = self.timeline_combo.currentIndex()
@@ -398,6 +413,6 @@ class MyWidget(QtGui.QWidget):
 
 if __name__ == "__main__":
     app = QtGui.QApplication([])
-    widget = MyWidget()
-    widget.show()
+    first_window = MainWindow()
+    first_window.show()
     sys.exit(app.exec_())
