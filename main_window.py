@@ -1,113 +1,20 @@
 # -*- coding: utf-8 -*-
-import sys
-import yaml
-import logging
-from functools import partial
 from PySide import QtCore, QtGui
 from PySide.QtGui import QFontDatabase
 from datetime import datetime
-from constants import HORIZONTAL_HEADERS, VERTICAL_HEADERS, COLUMNS, SEW_ERRORS, PRIMARY_COLOR, DANGER_COLOR, STYLE_SCROLLBAR
+from second_window import SecondWindow
+from functools import partial
+import logging
+from constants import HORIZONTAL_HEADERS, VERTICAL_HEADERS, PRIMARY_COLOR, DANGER_COLOR, COLUMNS, STYLE_SCROLLBAR
 
-# Configure logging
 logging.basicConfig(filename='sew_errors.log', level=logging.INFO, format='%(asctime)s - %(message)s')
 
-with open('config.yaml', 'r') as file:
-    config = yaml.safe_load(file)
-STATION = config["STATION"]
-
-class SecondWindow(QtGui.QWidget):
-    error_count_updated = QtCore.Signal(str, int)
-
-    def __init__(self, parent=None):
-        super(SecondWindow, self).__init__(parent)
-        self.resize(1024, 768)
-        self.setWindowTitle(u"Other Sewing Errors {}".format(STATION))
-        self.layout = QtGui.QVBoxLayout(self)
-
-        sew_error_layout = QtGui.QGridLayout()
-        self.layout.addLayout(sew_error_layout)
-
-        row = 0
-        col = 0
-
-        self.error_counts = {key: 0 for key in SEW_ERRORS.keys()}
-
-        for key, value in SEW_ERRORS.items():
-            block_layout = QtGui.QVBoxLayout()
-
-            label = QtGui.QLabel(value)
-            label.setAlignment(QtCore.Qt.AlignCenter)
-            font = label.font()
-            font.setPointSize(12)  # Increase the font size
-            label.setFont(font)
-            label.setFixedHeight(40)  # Set fixed height for the label
-
-            h_layout = QtGui.QHBoxLayout()
-            decrement_button = QtGui.QPushButton("-")
-            decrement_button.setStyleSheet("background-color: red; color: white; font-size: 20px;")
-            decrement_button.setFixedSize(40, 40)  # Set fixed size for decrement button
-            increment_button = QtGui.QPushButton("+")
-            increment_button.setStyleSheet("background-color: {}; color: white; font-size: 20px;".format(PRIMARY_COLOR))
-            increment_button.setFixedSize(40, 40)  # Set fixed size for increment button
-
-            count_label = QtGui.QLabel("0")
-            count_label.setStyleSheet("background-color: white; color: black; font-size: 20px;")
-            count_label.setAlignment(QtCore.Qt.AlignCenter)
-            count_label.setObjectName("count_label")
-
-            decrement_button.clicked.connect(partial(self.update_error_count, key, -1))
-            increment_button.clicked.connect(partial(self.update_error_count, key, 1))
-
-            h_layout.addWidget(decrement_button)
-            h_layout.addWidget(count_label)
-            h_layout.addWidget(increment_button)
-
-            block_widget = QtGui.QWidget()
-            block_layout = QtGui.QVBoxLayout(block_widget)
-            block_layout.addWidget(label)
-            block_layout.addLayout(h_layout)
-
-            # Apply border and border radius to the block
-            block_widget.setStyleSheet("""
-                QWidget {
-                    border: 1px solid black;
-                    border-radius: 6px;
-                    padding: 5px;
-                    background-color: white;
-                }
-            """)
-
-            sew_error_layout.addWidget(block_widget, row, col)
-            col += 1
-
-            if col == 4:
-                col = 0
-                row += 1
-
-        # Set equal column stretch factors
-        for i in range(4):
-            sew_error_layout.setColumnStretch(i, 1)
-
-    def update_error_count(self, key, delta):
-        self.error_counts[key] += delta
-        self.error_counts[key] = max(0, self.error_counts[key])  # Ensure count doesn't go below 0
-        self.update_error_labels(key)
-
-        # Emit the signal to notify the main window
-        self.error_count_updated.emit(key, delta)
-
-    def update_error_labels(self, key):
-        for widget in self.findChildren(QtGui.QWidget):
-            if isinstance(widget, QtGui.QLabel) and widget.text() in SEW_ERRORS[key]:
-                count_label = widget.parent().findChild(QtGui.QLabel, "count_label")
-                if count_label:
-                    count_label.setText(str(self.error_counts[key]))
-
 class MainWindow(QtGui.QWidget):
-    def __init__(self):
-        super(MainWindow, self).__init__()
-
-        self.setWindowTitle(u"QIP Sewing Inspection {}".format(STATION))
+    def __init__(self, station, parent=None):
+        super(MainWindow, self).__init__(parent)
+        
+        self.station = station
+        self.setWindowTitle(u"QIP Sewing Inspection {}".format(station))
         self.resize(1024, 768)
         self.second_window = None
         self.layout = QtGui.QVBoxLayout(self)
@@ -337,6 +244,7 @@ class MainWindow(QtGui.QWidget):
         return 0
 
     def update_error_count(self, key, delta):
+        print(key, delta)
         self.error_counts[key] += delta
         self.error_counts[key] = max(0, self.error_counts[key])  # Ensure count doesn't go below 0
         self.update_error_labels(key, delta)
@@ -394,7 +302,7 @@ class MainWindow(QtGui.QWidget):
         print("Opening other error window")
         # Khởi tạo cửa sổ phụ và hiển thị
         if not self.second_window:  # Nếu cửa sổ chưa tồn tại
-            self.second_window = SecondWindow()
+            self.second_window = SecondWindow(self.station)
         self.second_window.show()
         self.second_window.error_count_updated.connect(self.update_table_from_second_window)
 
@@ -410,9 +318,3 @@ class MainWindow(QtGui.QWidget):
             self.calculate_percentages()
         except ValueError:
             QtGui.QMessageBox.warning(self, "Invalid Input", "Please enter a valid number for quantity.")
-
-if __name__ == "__main__":
-    app = QtGui.QApplication([])
-    first_window = MainWindow()
-    first_window.show()
-    sys.exit(app.exec_())
