@@ -198,7 +198,7 @@ class MainWindow(QtGui.QWidget):
             count_label = QtGui.QLabel("0")
             count_label.setStyleSheet("background-color: white; color: black; font-size: 20px;")
             count_label.setAlignment(QtCore.Qt.AlignCenter)
-            count_label.setObjectName("count_label")
+            count_label.setObjectName(key)
 
             decrement_button.clicked.connect(partial(self.update_error_count, key, -1))
             increment_button.clicked.connect(partial(self.update_error_count, key, 1))
@@ -244,10 +244,12 @@ class MainWindow(QtGui.QWidget):
         return 0
 
     def update_error_count(self, key, delta):
-        print(key, delta)
+        if (self.error_counts[key] == 0 and delta == -1) or (self.error_counts[key] == 999 and delta == 1):
+            return
+        
         self.error_counts[key] += delta
         self.error_counts[key] = max(0, self.error_counts[key])  # Ensure count doesn't go below 0
-        self.update_error_labels(key, delta)
+        self.update_error_labels(key)
         
         logging.info(u"Update '{}' count changed by {}. New count: {}".format(key, delta, self.error_counts[key]))
 
@@ -275,10 +277,10 @@ class MainWindow(QtGui.QWidget):
         item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)  # Make cells read-only
         self.table_widget.setItem(1, timeline_idx, item)
 
-    def update_error_labels(self, key, delta):
+    def update_error_labels(self, key):
         for widget in self.findChildren(QtGui.QWidget):
             if isinstance(widget, QtGui.QLabel) and widget.text() in COLUMNS[key]:
-                count_label = widget.parent().findChild(QtGui.QLabel, "count_label")
+                count_label = widget.parent().findChild(QtGui.QLabel, key)
                 if count_label:
                     count_label.setText(str(self.error_counts[key]))
 
